@@ -6,6 +6,7 @@ package tools
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-tfe"
 	"github.com/hashicorp/terraform-mcp-server/pkg/client"
@@ -52,9 +53,9 @@ func CreateWorkspace(logger *log.Logger) server.ServerTool {
 			mcp.WithString("project_id",
 				mcp.Description("Optional project ID to associate the workspace with"),
 			),
-			mcp.WithString("vcs_repo_identifier",
-				mcp.Description("Optional VCS repository identifier (e.g., 'org/repo')"),
-			),
+		mcp.WithString("vcs_repo_identifier",
+			mcp.Description("Optional VCS repository identifier in human-readable 'owner/repo' format (e.g., 'my-org/my-repo' for GitHub/GitLab, or 'project/repo' for Bitbucket Server). Do NOT use UUIDs or internal IDs - this must be the slug-style identifier as it appears in the VCS provider URL."),
+		),
 			mcp.WithString("vcs_repo_branch",
 				mcp.Description("Optional VCS repository branch (default: main/master)"),
 			),
@@ -174,8 +175,14 @@ func createWorkspaceHandler(ctx context.Context, request mcp.CallToolRequest, lo
 		options.VCSRepo = vcsRepo
 	}
 
-	workspace, err := tfeClient.Workspaces.Create(ctx, terraformOrgName, *options)
+	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	workspace, err := tfeClient.Workspaces.Create(createCtx, terraformOrgName, *options)
 	if err != nil {
+		if createCtx.Err() == context.DeadlineExceeded {
+			return ToolErrorf(logger, "timed out creating workspace '%s' in org '%s' (server may be retrying) - check VCS configuration and try again", workspaceName, terraformOrgName)
+		}
 		return ToolErrorf(logger, "failed to create workspace '%s' in org '%s': %v", workspaceName, terraformOrgName, err)
 	}
 
