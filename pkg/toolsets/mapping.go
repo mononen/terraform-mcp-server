@@ -36,6 +36,7 @@ var ToolToToolset = map[string]string{
 	"get_run_details":                     Terraform,
 	"get_plan_details":                    Terraform,
 	"get_apply_details":                   Terraform,
+	"get_current_state":                   Terraform,
 	"create_run":                          Terraform,
 	"action_run":                          Terraform,
 	"list_workspace_variables":            Terraform,
